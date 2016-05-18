@@ -73,15 +73,22 @@ func (b *backend) AzureClient(s logical.Storage) (*azsql.SQLDatabaseClient, erro
 	if err := entry.DecodeJSON(&azureConfig); err != nil {
 		return nil, err
 	}
-
 	// Use the Azure Go SDK
-	cert, err := ioutil.ReadFile(azureConfig.ManagementCert)
-	if err != nil {
-		return nil, err
-	}
-	client, err := management.NewClient(azureConfig.SubscriptionID, cert)
-	if err != nil {
-		return nil, err
+	var client management.Client
+	if len(azureConfig.PublishSettings) > 0 {
+		client, err = management.ClientFromPublishSettingsFile(azureConfig.PublishSettings, azureConfig.SubscriptionID)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		cert, err := ioutil.ReadFile(azureConfig.ManagementCert)
+		if err != nil {
+			return nil, err
+		}
+		client, err = management.NewClient(azureConfig.SubscriptionID, cert)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	//Test out the client
@@ -178,7 +185,8 @@ func (b *backend) LeaseConfig(s logical.Storage) (*configLease, error) {
 }
 
 const backendHelp = `
-The MSSQL backend dynamically generates database users and create firewall rules for the users.
+The Azure SQL backend dynamically generates database users and 
+optionally create firewall rules for the users.
 
 After mounting this backend, configure it using the endpoints within
 the "config/" path.

@@ -85,13 +85,14 @@ type connectionConfig struct {
 }
 
 const pathConfigConnectionHelpSyn = `
-Configure the connection string to talk to Microsoft Sql Server.
+Configure the connection string to talk to Azure SQL Server.
 `
 
 const pathConfigConnectionHelpDesc = `
-This path configures the connection string used to connect to Sql Server.
+This path configures the connection string used to connect to Azure SQL Server.
 The value of the string is a Data Source Name (DSN). An example is
-using "server=<hostname>;port=<port>;user id=<username>;password=<password>;database=<database>;app name=vault;"
+"server=<hostname>;port=<port>;user id=<username>;password=<password>;database=<database>"
+The user must have permissions to create and modify users of the specified database
 
 When configuring the connection string, the backend will verify its validity.
 If the database is not available when setting the connection string, set the

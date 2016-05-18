@@ -157,12 +157,11 @@ The names of the variables must be surrounded by "{{" and "}}" to be replaced.
 
   * "password" - The random password generated for the DB user.
 
-Example SQL query to use:
+Example SQL query to use (Azure SQL Server V12):
 
-  CREATE LOGIN [{{name}}] WITH PASSWORD = '{{password}}';
-  CREATE USER [{{name}}] FROM LOGIN [{{name}}];
+  CREATE USER [{{name}}] WITH PASSWORD = '{{password}}';
   GRANT SELECT, UPDATE, DELETE, INSERT on SCHEMA::dbo TO [{{name}}];
 
-Please see the Microsoft SQL Server manual on the GRANT command to learn how to
+Please see the Azure SQL Server manual on the GRANT command to learn how to
 do more fine grained access.
 `

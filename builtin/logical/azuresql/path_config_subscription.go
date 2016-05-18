@@ -19,7 +19,7 @@ func pathConfigSubscription(b *backend) *framework.Path {
 			},
 			"management_cert": &framework.FieldSchema{
 				Type:        framework.TypeString,
-				Description: "Path to the management certificate PEM file",
+				Description: "Absolute path to the management certificate PEM file",
 			},
 			"server": &framework.FieldSchema{
 				Type:        framework.TypeString,
@@ -31,7 +31,7 @@ func pathConfigSubscription(b *backend) *framework.Path {
 			},
 			"publish_settings": &framework.FieldSchema{
 				Type:        framework.TypeString,
-				Description: "Path to .publisSettings file that has subscription creds",
+				Description: "Absolute path to .publishSettings file from https://manage.windowsazure.com/publishsettings",
 			},
 			"verify": &framework.FieldSchema{
 				Type:        framework.TypeBool,
@@ -51,16 +51,16 @@ func pathConfigSubscription(b *backend) *framework.Path {
 
 func (b *backend) pathSubscriptionWrite(
 	req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
-	publishSettings := data.Get("publish_settings").(string)
 	subscriptionID := data.Get("subscription_id").(string)
 	managementCert := data.Get("management_cert").(string)
 	server := data.Get("server").(string)
 	database := data.Get("database").(string)
+	publishSettings := data.Get("publish_settings").(string)
 
 	// Don't check the subscription if verification is disabled
 	verifyConnection := data.Get("verify").(bool)
 	if verifyConnection {
-		// Use the Azure Go Client
+		// Use the Azure Go SDK
 		var client management.Client
 		var err error
 		if len(publishSettings) > 0 {
@@ -87,10 +87,11 @@ func (b *backend) pathSubscriptionWrite(
 
 	// Store it
 	entry, err := logical.StorageEntryJSON("config/subscription", subscriptionConfig{
-		SubscriptionID: subscriptionID,
-		ManagementCert: managementCert,
-		Server:         server,
-		Database:       database,
+		SubscriptionID:  subscriptionID,
+		ManagementCert:  managementCert,
+		Server:          server,
+		Database:        database,
+		PublishSettings: publishSettings,
 	})
 
 	if err != nil {
@@ -104,18 +105,24 @@ func (b *backend) pathSubscriptionWrite(
 }
 
 type subscriptionConfig struct {
-	SubscriptionID string `json:"subscription_id"`
-	ManagementCert string `json:"management_cert"`
-	Server         string `json:"server"`
-	Database       string `json:"database"`
+	SubscriptionID  string `json:"subscription_id"`
+	ManagementCert  string `json:"management_cert"`
+	Server          string `json:"server"`
+	Database        string `json:"database"`
+	PublishSettings string `json:"publish_settings"`
 }
 
 const pathConfigSubscriptionHelpSyn = `
-Configure the subscription and connection details to talk to Azure Sql Server.
+Configure the subscription and connection details to talk to Azure SQL Server.
 `
 
 const pathConfigSubscriptionHelpDesc = `
-This path configures the subscription credentials of an the Azure subscription that the Azure SQL server belongs to.
+This path configures the subscription credentials of an the Azure subscription 
+that the Azure SQL server belongs to.
+
+You can use either a .publishSettings file from https://manage.windowsazure.com/publishsettings 
+or a PEM certificate file. If both are provided, the .publishSettings file 
+will be used.
 
 When configuring the subscription, the backend will verify its validity.
 If the subscription is not available when setting the connection string, set the

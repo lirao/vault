@@ -75,6 +75,17 @@ func testAccStepConfig(t *testing.T) logicaltest.TestStep {
 	}
 }
 
+func testAccStepConfigSub(t *testing.T) logicaltest.TestStep {
+	return logicaltest.TestStep{
+		Operation: logical.UpdateOperation,
+		Path:      "config/subscription",
+		Data: map[string]interface{}{
+			"subscription_id": os.Getenv("MSSQL_DSN"),
+			"verify":          false,
+		},
+	}
+}
+
 func testAccStepRole(t *testing.T) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.UpdateOperation,

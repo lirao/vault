@@ -138,5 +138,9 @@ Request database credentials for a certain role.
 const pathCredsCreateHelpDesc = `
 This path reads database credentials for a certain role. The
 database credentials will be generated on demand and will be automatically
-revoked when the lease is up.
+revoked when the lease is up. 
+
+If role is generated with /creds/<role-name>/<ip-address>, an Azure firewall 
+allow rule will be created for the given IP address (config/subscription needs 
+to be configured).
 `
