@@ -16,6 +16,7 @@ import (
 	credUserpass "github.com/hashicorp/vault/builtin/credential/userpass"
 
 	"github.com/hashicorp/vault/builtin/logical/aws"
+	"github.com/hashicorp/vault/builtin/logical/azuresql"
 	"github.com/hashicorp/vault/builtin/logical/cassandra"
 	"github.com/hashicorp/vault/builtin/logical/consul"
 	"github.com/hashicorp/vault/builtin/logical/mssql"
@@ -79,6 +80,7 @@ func Commands(metaPtr *meta.Meta) map[string]cli.CommandFactory {
 					"pki":        pki.Factory,
 					"transit":    transit.Factory,
 					"mssql":      mssql.Factory,
+					"azuresql":   azuresql.Factory,
 					"mysql":      mysql.Factory,
 					"ssh":        ssh.Factory,
 					"rabbitmq":   rabbitmq.Factory,
