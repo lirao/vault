@@ -80,8 +80,9 @@ func testAccStepConfigSub(t *testing.T) logicaltest.TestStep {
 		Operation: logical.UpdateOperation,
 		Path:      "config/subscription",
 		Data: map[string]interface{}{
-			"subscription_id": os.Getenv("MSSQL_DSN"),
-			"verify":          false,
+			"subscription_id":  os.Getenv("AZURE_SUB_ID"),
+			"publish_settings": os.Getenv("AZURE_PUBLISH_SETTINGS"),
+			"verify":           false,
 		},
 	}
 }
