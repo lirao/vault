@@ -20,6 +20,7 @@ func TestBackend_basic(t *testing.T) {
 		Backend:        b,
 		Steps: []logicaltest.TestStep{
 			testAccStepConfig(t),
+			testAccStepConfigSub(t),
 			testAccStepRole(t),
 			testAccStepReadCreds(t, "web"),
 		},
@@ -35,6 +36,7 @@ func TestBackend_roleCrud(t *testing.T) {
 		Backend:        b,
 		Steps: []logicaltest.TestStep{
 			testAccStepConfig(t),
+			testAccStepConfigSub(t),
 			testAccStepRole(t),
 			testAccStepReadRole(t, "web", testRoleSQL),
 			testAccStepDeleteRole(t, "web"),
@@ -48,10 +50,9 @@ func TestBackend_leaseWriteRead(t *testing.T) {
 
 	logicaltest.Test(t, logicaltest.TestCase{
 		AcceptanceTest: true,
-		PreCheck:       func() { testAccPreCheck(t) },
+		PreCheck:       func() {},
 		Backend:        b,
 		Steps: []logicaltest.TestStep{
-			testAccStepConfig(t),
 			testAccStepWriteLease(t),
 			testAccStepReadLease(t),
 		},
@@ -60,8 +61,23 @@ func TestBackend_leaseWriteRead(t *testing.T) {
 }
 
 func testAccPreCheck(t *testing.T) {
-	if v := os.Getenv("MSSQL_DSN"); v == "" {
-		t.Fatal("MSSQL_DSN must be set for acceptance tests")
+	if v := os.Getenv("AZURESQL_DSN"); v == "" {
+		t.Fatal("AZURESQL_DSN must be set for acceptance tests")
+	}
+	if v := os.Getenv("AZURESQL_SUB_ID"); v == "" {
+		t.Fatal("AZURESQL_SUB_ID must be set for acceptance tests")
+	}
+	if v := os.Getenv("AZURESQL_SUB_CERT"); v == "" {
+		t.Fatal("AZURESQL_SUB_CERT must be set for acceptance tests")
+	}
+	if v := os.Getenv("AZURESQL_SERVER"); v == "" {
+		t.Fatal("AZURESQL_SERVER must be set for acceptance tests")
+	}
+	if v := os.Getenv("AZURESQL_DATABASE"); v == "" {
+		t.Fatal("AZURESQL_DATABASE must be set for acceptance tests")
+	}
+	if v := os.Getenv("AZURESQL_HOST_IP"); v == "" {
+		t.Fatal("AZURESQL_HOST_IP must be set for acceptance tests")
 	}
 }
 
@@ -70,7 +86,7 @@ func testAccStepConfig(t *testing.T) logicaltest.TestStep {
 		Operation: logical.UpdateOperation,
 		Path:      "config/connection",
 		Data: map[string]interface{}{
-			"connection_string": os.Getenv("MSSQL_DSN"),
+			"connection_string": os.Getenv("AZURESQL_DSN"),
 		},
 	}
 }
@@ -80,9 +96,11 @@ func testAccStepConfigSub(t *testing.T) logicaltest.TestStep {
 		Operation: logical.UpdateOperation,
 		Path:      "config/subscription",
 		Data: map[string]interface{}{
-			"subscription_id":  os.Getenv("AZURE_SUB_ID"),
-			"publish_settings": os.Getenv("AZURE_PUBLISH_SETTINGS"),
-			"verify":           false,
+			"subscription_id": os.Getenv("AZURESQL_SUB_ID"),
+			"management_cert": os.Getenv("AZURESQL_SUB_CERT"),
+			"server":          os.Getenv("AZURESQL_SERVER"),
+			"database":        os.Getenv("AZURESQL_DATABASE"),
+			"verify":          false,
 		},
 	}
 }
@@ -107,11 +125,12 @@ func testAccStepDeleteRole(t *testing.T, n string) logicaltest.TestStep {
 func testAccStepReadCreds(t *testing.T, name string) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.ReadOperation,
-		Path:      "creds/" + name,
+		Path:      "creds/" + name + "/" + os.Getenv("AZURESQL_HOST_IP"),
 		Check: func(resp *logical.Response) error {
 			var d struct {
 				Username string `mapstructure:"username"`
 				Password string `mapstructure:"password"`
+				FWRule   string `mapstructure:"fwrule"`
 			}
 			if err := mapstructure.Decode(resp.Data, &d); err != nil {
 				return err
@@ -178,7 +197,6 @@ func testAccStepReadLease(t *testing.T) logicaltest.TestStep {
 }
 
 const testRoleSQL = `
-CREATE LOGIN [{{name}}] WITH PASSWORD = '{{password}}';
-CREATE USER [{{name}}] FOR LOGIN [{{name}}];
-GRANT SELECT ON SCHEMA::dbo TO [{{name}}]
+CREATE USER [{{name}}] WITH PASSWORD = '{{password}}';
+GRANT SELECT ON SCHEMA::vault TO [{{name}}]
 `

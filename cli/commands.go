@@ -16,6 +16,7 @@ import (
 	credUserpass "github.com/hashicorp/vault/builtin/credential/userpass"
 
 	"github.com/hashicorp/vault/builtin/logical/aws"
+	"github.com/hashicorp/vault/builtin/logical/azuresas"
 	"github.com/hashicorp/vault/builtin/logical/azuresql"
 	"github.com/hashicorp/vault/builtin/logical/cassandra"
 	"github.com/hashicorp/vault/builtin/logical/consul"
@@ -74,6 +75,7 @@ func Commands(metaPtr *meta.Meta) map[string]cli.CommandFactory {
 				},
 				LogicalBackends: map[string]logical.Factory{
 					"aws":        aws.Factory,
+					"azuresas":   azuresas.Factory,
 					"consul":     consul.Factory,
 					"postgresql": postgresql.Factory,
 					"cassandra":  cassandra.Factory,
