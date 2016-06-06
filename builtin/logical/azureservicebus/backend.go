@@ -1,4 +1,4 @@
-package azuresas
+package azureservicebus
 
 import (
 	"strings"

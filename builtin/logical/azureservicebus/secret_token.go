@@ -1,4 +1,4 @@
-package azuresas
+package azureservicebus
 
 import (
 	"github.com/hashicorp/vault/logical"

@@ -1,4 +1,4 @@
-package azuresas
+package azureservicebus
 
 import (
 	"fmt"
@@ -39,7 +39,7 @@ func TestBackend_roleCrud(t *testing.T) {
 		Steps: []logicaltest.TestStep{
 			testAccStepConfig(t),
 			testAccStepRole(t),
-			testAccStepReadRole(t, "web", os.Getenv("AZURESAS_POLICY"), 0),
+			testAccStepReadRole(t, "web", os.Getenv("SERVICEBUS_POLICY"), 0),
 			testAccStepDeleteRole(t, "web"),
 			testAccStepReadRole(t, "web", "", 0),
 		},
@@ -57,7 +57,7 @@ func TestBackend_roleLeaseRead(t *testing.T) {
 			testAccStepConfig(t),
 			testAccStepRoleLease(t, "30m"),
 			testAccStepWriteLease(t),
-			testAccStepReadRole(t, "web", os.Getenv("AZURESAS_POLICY"), 30*time.Minute),
+			testAccStepReadRole(t, "web", os.Getenv("SERVICEBUS_POLICY"), 30*time.Minute),
 			testAccStepReadLease(t),
 		},
 	})
@@ -79,17 +79,17 @@ func TestBackend_leaseWriteRead(t *testing.T) {
 }
 
 func testAccPreCheck(t *testing.T) {
-	if v := os.Getenv("AZURESAS_RESNAME"); v == "" {
-		t.Fatal("AZURESAS_RESNAME must be set for acceptance tests")
+	if v := os.Getenv("SERVICEBUS_RESNAME"); v == "" {
+		t.Fatal("SERVICEBUS_RESNAME must be set for acceptance tests")
 	}
-	if v := os.Getenv("AZURESAS_NAMESPACE"); v == "" {
-		t.Fatal("AZURESAS_NAMESPACE must be set for acceptance tests")
+	if v := os.Getenv("SERVICEBUS_NAMESPACE"); v == "" {
+		t.Fatal("SERVICEBUS_NAMESPACE must be set for acceptance tests")
 	}
-	if v := os.Getenv("AZURESAS_POLICY"); v == "" {
-		t.Fatal("AZURESAS_POLICY must be set for acceptance tests")
+	if v := os.Getenv("SERVICEBUS_POLICY"); v == "" {
+		t.Fatal("SERVICEBUS_POLICY must be set for acceptance tests")
 	}
-	if v := os.Getenv("AZURESAS_KEY"); v == "" {
-		t.Fatal("AZURESAS_KEY must be set for acceptance tests")
+	if v := os.Getenv("SERVICEBUS_KEY"); v == "" {
+		t.Fatal("SERVICEBUS_KEY must be set for acceptance tests")
 	}
 }
 
@@ -98,8 +98,8 @@ func testAccStepConfig(t *testing.T) logicaltest.TestStep {
 		Operation: logical.UpdateOperation,
 		Path:      "config/resource",
 		Data: map[string]interface{}{
-			"name":      os.Getenv("AZURESAS_RESNAME"),
-			"namespace": os.Getenv("AZURESAS_NAMESPACE"),
+			"name":      os.Getenv("SERVICEBUS_RESNAME"),
+			"namespace": os.Getenv("SERVICEBUS_NAMESPACE"),
 		},
 	}
 }
@@ -109,8 +109,8 @@ func testAccStepRole(t *testing.T) logicaltest.TestStep {
 		Operation: logical.UpdateOperation,
 		Path:      "roles/web",
 		Data: map[string]interface{}{
-			"sas_policy_name": os.Getenv("AZURESAS_POLICY"),
-			"sas_policy_key":  os.Getenv("AZURESAS_KEY"),
+			"sas_policy_name": os.Getenv("SERVICEBUS_POLICY"),
+			"sas_policy_key":  os.Getenv("SERVICEBUS_KEY"),
 		},
 	}
 }
@@ -120,8 +120,8 @@ func testAccStepRoleLease(t *testing.T, ttl string) logicaltest.TestStep {
 		Operation: logical.UpdateOperation,
 		Path:      "roles/web",
 		Data: map[string]interface{}{
-			"sas_policy_name": os.Getenv("AZURESAS_POLICY"),
-			"sas_policy_key":  os.Getenv("AZURESAS_KEY"),
+			"sas_policy_name": os.Getenv("SERVICEBUS_POLICY"),
+			"sas_policy_key":  os.Getenv("SERVICEBUS_KEY"),
 			"ttl":             ttl,
 		},
 	}
@@ -149,7 +149,7 @@ func testAccStepReadVerifyToken(t *testing.T, name string) logicaltest.TestStep 
 			log.Printf("[WARN] Generated token: %v", d)
 
 			//Use HTTP POST REST API to verify this
-			url := fmt.Sprintf("https://%s.servicebus.windows.net/%s/messages", os.Getenv("AZURESAS_NAMESPACE"), os.Getenv("AZURESAS_RESNAME"))
+			url := fmt.Sprintf("https://%s.servicebus.windows.net/%s/messages", os.Getenv("SERVICEBUS_NAMESPACE"), os.Getenv("SERVICEBUS_RESNAME"))
 
 			client := &http.Client{}
 
