@@ -77,11 +77,15 @@ func (b *backend) ResourceConfig(s logical.Storage) (*resourceConfig, error) {
 }
 
 const backendHelp = `
-The Azure Service Bus SAS backend generates SAS strings for Service Bus 
+The Azure Service Bus SAS Token backend generates SAS tokens for Service Bus 
 resources, which can include Service Bus relays, queues, topics, and Event Hubs.
+
+Explaination and usage:
+https://azure.microsoft.com/en-us/documentation/articles/service-bus-sas-overview/
 
 After mounting this backend, configure it using the endpoints within
 the "config/" path.
 
-Does not support Storage Services SAS.
+Not to be confused with Azure Storage SAS URIs, which is supported by the 
+azurestorage backend.
 `
