@@ -59,5 +59,7 @@ Configure the uri for Service Bus SAS tokens.
 `
 
 const pathConfigResourceHelpDesc = `
-Configures a Service Bus resource that you need SAS tokens for.
+Configures a Service Bus resource that you need SAS tokens for. This is where 
+you specify the name of the resource you want to access (e.g. Event Hub, Queue Topic), 
+and the Service Bus namespace it's in. 
 `

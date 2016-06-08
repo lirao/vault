@@ -1,6 +1,7 @@
 package azureservicebus
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -47,7 +48,7 @@ func (b *backend) LeaseConfig(s logical.Storage) (*configLease, error) {
 		return nil, err
 	}
 	if entry == nil {
-		return nil, nil
+		return nil, fmt.Errorf("configure the default token expiry time with config/lease first")
 	}
 
 	var result configLease
@@ -65,7 +66,7 @@ func (b *backend) ResourceConfig(s logical.Storage) (*resourceConfig, error) {
 		return nil, err
 	}
 	if entry == nil {
-		return nil, nil
+		return nil, fmt.Errorf("configure the Azure Service Bus resource you wish to access with config/resource first")
 	}
 
 	var result resourceConfig
