@@ -1,7 +1,7 @@
 ---
 layout: "docs"
 page_title: "Secret Backend: azuresql"
-sidebar_current: "docs-secrets-mssql"
+sidebar_current: "docs-secrets-azuresql"
 description: |-
   The Azure SQL secret backend for Vault generates database credentials to access Azure SQL Server.
 ---
@@ -22,9 +22,10 @@ Vault makes use of its own internal revocation system to ensure that users
 become invalid within a reasonable time of the lease expiring.
 
 This works almost exactly like the MSSQL Secret Backend, except that it has an
-additional feature: When services request for a role, they need to give vault their
+additional feature: When services request for a role, they have the option to give their
 host IP address, so that a firewall rule for the role can be created and managed by
-vault.
+vault. It only supports Azure SQL Database V12, as it assumes all users are created 
+in contained database user model.
 
 This page will show a quick start for this backend. For detailed documentation
 on every path, use `vault path-help` after mounting the backend.
@@ -51,19 +52,25 @@ Success! Data written to: azuresql/config/connection
 In this case, we've configured Vault with the user "server_admin_login" and password "Password!",
 connecting to an instance at "localhost" on port 1433. The server admin user was created
 during resource launch from the Azure portal, but you can use any user with privileges to create
-users and grant permissions for the particular database you want to to connect to. 
+users and grant permissions for the particular database you want to to connect to.
 
-We then need to configure Vault to be able to access Azure management settings. This is needed to
-manage firewall rules for each generated credentials.
+If firewall rules need to be created, then we need to configure Vault to access Azure management 
+settings. This is needed to manage firewall rules for each generated credentials.
 
 ```
 $ vault write azuresql/config/subscription \
  subscription_id=xxxx000-xxxx-xxxx-xxxx-xxxx1111xxxx \
  server=azure_sql_server \
- database= my_azure_db \
  management_cert=/home/vaultuser/azure_mgmt_cert.pem
-Success! Data written to: azuresql/config/connection
+Success! Data written to: azuresql/config/subscription
 ```
+
+Here, we've specified the name of the Azure SQL server, the subscription ID of the 
+server, and the absolute path of the management PEM certificate of the subscription.
+This allows Vault to create and delete firewall rules on the Azure SQL server.
+The management certificate file can be obtained and extracted in this way:
+http://stuartpreston.net/2015/02/retrieving-microsoft-azure-management-certificates-for-use-in-cross-platform-automationprovisioning-tools/
+
 
 Optionally, we can configure the lease settings for credentials generated
 by Vault. This is done by writing to the `config/lease` key:
@@ -85,28 +92,31 @@ to a policy used to generate those credentials. For example, lets create
 a "readonly" role:
 
 ```
-$ vault write mssql/roles/readonly \
-    sql="CREATE LOGIN [{{name}}] WITH PASSWORD = '{{password}}'; USE AdventureWorks; CREATE USER [{{name}}] FOR LOGIN [{{name}}]; GRANT SELECT ON SCHEMA::dbo TO [{{name}}]"
-Success! Data written to: mssql/roles/readonly
+$ vault write azuresql/roles/readonly \
+    sql="CREATE USER [{{name}}] WITH PASSWORD = '{{password}}'; GRANT SELECT ON SCHEMA::vault TO [{{name}}]"
+Success! Data written to: azuresql/roles/readonly
 ```
 
 By writing to the `roles/readonly` path we are defining the `readonly` role.
 This role will be created by evaluating the given `sql` statements. By
 default, the `{{name}}` and `{{password}}` fields will be populated by
-Vault with dynamically generated values. This SQL statement is creating
-the named login on the server, user on the AdventureWorks database, and
-then granting it `SELECT` on the `dbo` schema. More complex `GRANT` queries
-can be used to customize the privileges of the role.
+Vault with dynamically generated values. 
 
-To generate a new set of credentials, we simply read from that role:
+This backend assumes that all users are to be created under the contained 
+database model, which uses a similar syntax like the example shown. 
+`GRANT` queries can be used to customize the privileges of the role.
 
+To generate a new set of credentials without adding firewall rules, we just 
+read from that role:
 ```
-$ vault read mssql/creds/readonly
-Key           	Value
-lease_id      	mssql/creds/readonly/cdf23ac8-6dbd-4bf9-9919-6acaaa86ba6c
-lease_duration	3600
-password      	ee202d0d-e4fd-4410-8d14-2a78c5c8cb76
-username      	root-a147d529-e7d6-4a16-8930-4c3e72170b19
+vault read azuresql/creds/readonly
+Key            	Value
+lease_id       	azuresql/creds/readonly/a80c8cff-7d4f-edcf-37b8-c341506a966c
+lease_duration 	60
+lease_renewable	true
+fwrule
+password       	1b615d23-7484-3cf9-3420-ea6f4565a3ec
+username       	root-ca230771-3abe-3cb1-21a4-05388844dd23
 ```
 
 By reading from the `creds/readonly` path, Vault has generated a new
@@ -114,27 +124,40 @@ set of credentials using the `readonly` role configuration. Here we
 see the dynamically generated username and password, along with a one
 hour lease.
 
-Using ACLs, it is possible to restrict using the mssql backend such
-that trusted operators can manage the role definitions, and both
-users and applications are restricted in the credentials they are
-allowed to read.
+If Azure SQL Server is set up with a Firewall that does not allow all 
+incoming password, then in order for a user to be able to use the generated 
+credentials, we need to add a firewall rule. The IP to be added to the 
+rule is appended to the `creds/readonly` path:
+
+```
+$ vault read azuresql/creds/readonly/112.22.25.32
+Key            	Value
+lease_id       	azuresql/creds/readonly/112.22.25.32/c30b8fa5-6c1c-4c38-53bd-c597133645e0
+lease_duration 	60
+lease_renewable	true
+fwrule         	0b9ebcb5-801c-d85c-9aa1-e02e25558b91-112.22.25.32
+password       	38c82607-1e1f-0321-603d-d295a53b18dd
+username       	root-0b9ebcb5-801c-d85c-9aa1-e02e25558b91
+```
+This requires the `config/subscription` path to be set up with Azure SQL Server 
+management rights.
 
 ## API
 
-### /mssql/config/connection
+### /azuresql/config/connection
 #### POST
 
 <dl class="api">
   <dt>Description</dt>
   <dd>
-    Configures the connection DSN used to communicate with Sql Server.
+    Configures the connection DSN used to communicate with Azure SQL Database.
   </dd>
 
   <dt>Method</dt>
   <dd>POST</dd>
 
   <dt>URL</dt>
-  <dd>`/mssql/config/connection`</dd>
+  <dd>`/azuresql/config/connection`</dd>
 
   <dt>Parameters</dt>
   <dd>
@@ -142,7 +165,7 @@ allowed to read.
       <li>
         <span class="param">connection_string</span>
         <span class="param-flags">required</span>
-        The MSSQL DSN
+        The DSN to connect to the Azure SQL Database.
       </li>
     </ul>
   </dd>
@@ -173,7 +196,69 @@ allowed to read.
   </dd>
 </dl>
 
-### /mssql/config/lease
+### /azuresql/config/subscription
+#### POST
+
+<dl class="api">
+  <dt>Description</dt>
+  <dd>
+    Configures the Azure Subscription information of the Azure SQL server.
+  </dd>
+
+  <dt>Method</dt>
+  <dd>POST</dd>
+
+  <dt>URL</dt>
+  <dd>`/azuresql/config/subscription`</dd>
+
+  <dt>Parameters</dt>
+  <dd>
+    <ul>
+      <li>
+        <span class="param">subscription_id</span>
+        <span class="param-flags">required</span>
+	Azure Subscription ID.
+      </li>
+    </ul>
+  </dd>
+  <dd>
+    <ul>
+      <li>
+        <span class="param">management_cert</span>
+        <span class="param-flags">required</span>
+	Absolute path to the management certificate of the subscription, as a PEM file.
+	Defaults to 2.
+      </li>
+    </ul>
+  </dd>
+  <dd>
+    <ul>
+      <li>
+        <span class="param">server</span>
+        <span class="param-flags">required</span>
+	Name of the Azure SQL Server.
+      </li>
+    </ul>
+  </dd>
+  <dd>
+    <ul>
+      <li>
+        <span class="param">verify</span>
+        <span class="param-flags">optional</span>
+	If set, the subscription details is verified by connecting to Azure.
+	Defaults to true.
+      </li>
+    </ul>
+  </dd>
+
+  <dt>Returns</dt>
+  <dd>
+    A `204` response code.
+  </dd>
+</dl>
+
+
+### /azuresql/config/lease
 #### POST
 
 <dl class="api">
@@ -186,7 +271,7 @@ allowed to read.
   <dd>POST</dd>
 
   <dt>URL</dt>
-  <dd>`/mssql/config/lease`</dd>
+  <dd>`/azuresql/config/lease`</dd>
 
   <dt>Parameters</dt>
   <dd>
@@ -212,7 +297,7 @@ allowed to read.
   </dd>
 </dl>
 
-### /mssql/roles/
+### /azuresql/roles/
 #### POST
 
 <dl class="api">
@@ -225,7 +310,7 @@ allowed to read.
   <dd>POST</dd>
 
   <dt>URL</dt>
-  <dd>`/mssql/roles/<name>`</dd>
+  <dd>`/azuresql/roles/<name>`</dd>
 
   <dt>Parameters</dt>
   <dd>
@@ -234,7 +319,8 @@ allowed to read.
         <span class="param">sql</span>
         <span class="param-flags">required</span>
         The SQL statements executed to create and configure the role.
-        Must be semi-colon separated. The '{{name}}' and '{{password}}'
+        Must be semi-colon separated. User must be created in contained
+        database user mode. The '{{name}}' and '{{password}}'
         values will be substituted.
       </li>
     </ul>
@@ -258,7 +344,7 @@ allowed to read.
   <dd>GET</dd>
 
   <dt>URL</dt>
-  <dd>`/mssql/roles/<name>`</dd>
+  <dd>`/azuresql/roles/<name>`</dd>
 
   <dt>Parameters</dt>
   <dd>
@@ -271,7 +357,7 @@ allowed to read.
     ```javascript
     {
       "data": {
-        "sql": "CREATE LOGIN..."
+        "sql": "CREATE USER..."
       }
     }
     ```
@@ -329,7 +415,7 @@ allowed to read.
   <dd>DELETE</dd>
 
   <dt>URL</dt>
-  <dd>`/mssql/roles/<name>`</dd>
+  <dd>`/azuresql/roles/<name>`</dd>
 
   <dt>Parameters</dt>
   <dd>
@@ -342,20 +428,21 @@ allowed to read.
   </dd>
 </dl>
 
-### /mssql/creds/
+### /azuresql/creds/
 #### GET
 
 <dl class="api">
   <dt>Description</dt>
   <dd>
     Generates a new set of dynamic credentials based on the named role.
+    Will also create a firewall rule for the (optional) given ip.
   </dd>
 
   <dt>Method</dt>
   <dd>GET</dd>
 
   <dt>URL</dt>
-  <dd>`/mssql/creds/<name>`</dd>
+  <dd>`/azuresql/creds/<name>[/<ip>]`</dd>
 
   <dt>Parameters</dt>
   <dd>
@@ -368,6 +455,7 @@ allowed to read.
     ```javascript
     {
       "data": {
+        "fwrule":   "0b9ebcb5-801c-d85c-9aa1-e02e25558b91-112.22.25.32"
         "username": "root-a147d529-e7d6-4a16-8930-4c3e72170b19",
         "password": "ee202d0d-e4fd-4410-8d14-2a78c5c8cb76"
       }

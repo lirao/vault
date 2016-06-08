@@ -23,11 +23,7 @@ func pathConfigSubscription(b *backend) *framework.Path {
 			},
 			"server": &framework.FieldSchema{
 				Type:        framework.TypeString,
-				Description: "Server name",
-			},
-			"database": &framework.FieldSchema{
-				Type:        framework.TypeString,
-				Description: "Database name",
+				Description: "Azure SQL Server name",
 			},
 			"publish_settings": &framework.FieldSchema{
 				Type:        framework.TypeString,
@@ -54,7 +50,6 @@ func (b *backend) pathSubscriptionWrite(
 	subscriptionID := data.Get("subscription_id").(string)
 	managementCert := data.Get("management_cert").(string)
 	server := data.Get("server").(string)
-	database := data.Get("database").(string)
 	publishSettings := data.Get("publish_settings").(string)
 
 	// Don't check the subscription if verification is disabled
@@ -79,7 +74,7 @@ func (b *backend) pathSubscriptionWrite(
 			}
 		}
 		dbclient := sql.NewClient(client)
-		_, err = dbclient.GetDatabase(server, database)
+		_, err = dbclient.ListFirewallRules(server)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +85,6 @@ func (b *backend) pathSubscriptionWrite(
 		SubscriptionID:  subscriptionID,
 		ManagementCert:  managementCert,
 		Server:          server,
-		Database:        database,
 		PublishSettings: publishSettings,
 	})
 
@@ -108,7 +102,6 @@ type subscriptionConfig struct {
 	SubscriptionID  string `json:"subscription_id"`
 	ManagementCert  string `json:"management_cert"`
 	Server          string `json:"server"`
-	Database        string `json:"database"`
 	PublishSettings string `json:"publish_settings"`
 }
 
@@ -118,7 +111,8 @@ Configure the subscription and connection details to talk to Azure SQL Server.
 
 const pathConfigSubscriptionHelpDesc = `
 This path configures the subscription credentials of an the Azure subscription 
-that the Azure SQL server belongs to.
+that the Azure SQL server belongs to. It's used to add firewall rules to the 
+Azure SQL Server.
 
 You can use either a .publishSettings file from https://manage.windowsazure.com/publishsettings 
 or a PEM certificate file. If both are provided, the .publishSettings file 

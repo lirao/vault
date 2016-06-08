@@ -47,7 +47,6 @@ type backend struct {
 	db          *sql.DB
 	defaultDb   string
 	server      string
-	database    string
 	lock        sync.Mutex
 }
 
@@ -93,14 +92,13 @@ func (b *backend) AzureClient(s logical.Storage) (*azsql.SQLDatabaseClient, erro
 
 	//Test out the client
 	azClient := azsql.NewClient(client)
-	_, err = azClient.GetDatabase(azureConfig.Server, azureConfig.Database)
+	_, err = azClient.ListFirewallRules(azureConfig.Server)
 	if err != nil {
 		return nil, err
 	}
 
 	b.azureClient = &azClient
 	b.server = azureConfig.Server
-	b.database = azureConfig.Database
 	return b.azureClient, nil
 }
 

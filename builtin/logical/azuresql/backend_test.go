@@ -73,9 +73,6 @@ func testAccPreCheck(t *testing.T) {
 	if v := os.Getenv("AZURESQL_SERVER"); v == "" {
 		t.Fatal("AZURESQL_SERVER must be set for acceptance tests")
 	}
-	if v := os.Getenv("AZURESQL_DATABASE"); v == "" {
-		t.Fatal("AZURESQL_DATABASE must be set for acceptance tests")
-	}
 	if v := os.Getenv("AZURESQL_HOST_IP"); v == "" {
 		t.Fatal("AZURESQL_HOST_IP must be set for acceptance tests")
 	}
@@ -99,7 +96,6 @@ func testAccStepConfigSub(t *testing.T) logicaltest.TestStep {
 			"subscription_id": os.Getenv("AZURESQL_SUB_ID"),
 			"management_cert": os.Getenv("AZURESQL_SUB_CERT"),
 			"server":          os.Getenv("AZURESQL_SERVER"),
-			"database":        os.Getenv("AZURESQL_DATABASE"),
 			"verify":          false,
 		},
 	}
