@@ -69,8 +69,7 @@ func (b *backend) pathTokenRead(
 
 	// Return the secret. Nothing need to be saved in the secret itself
 	resp := b.Secret(SecretTokenType).Response(map[string]interface{}{
-		"policy_name": name,
-		"token":       token,
+		"token": token,
 	}, map[string]interface{}{})
 	resp.Secret.TTL = ttl
 	return resp, nil

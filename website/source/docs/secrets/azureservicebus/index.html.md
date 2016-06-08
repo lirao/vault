@@ -10,148 +10,116 @@ description: |-
 
 Name: `azureservicebus`
 
-The Azure Service Bus secret backend for Vault generates Service Bus SAS 
-Tokens dynamically based on configured roles. This means that services that need
-to access a database no longer need to hardcode credentials: they can request
-them from Vault, and use Vault's leasing mechanism to more easily roll keys.
+The Azure Service Bus secret backend for Vault generates Service Bus Service Access 
+Signature (SAS) Tokens dynamically based on configured roles, which corresponds to 
+Shared Access Policies. 
 
-Additionally, it introduces a new ability: with every service accessing
-the database with unique credentials, it makes auditing much easier when
-questionable data access is discovered: you can track it down to the specific
-instance of a service based on the SQL username.
+You can learn more about using SAS Tokens to authenticate against Service Bus 
+resources here: https://azure.microsoft.com/en-us/documentation/articles/service-bus-shared-access-signature-authentication/ 
 
-Vault makes use of its own internal revocation system to ensure that users
-become invalid within a reasonable time of the lease expiring.
+SAS tokens expire automatically, so Vault cannot renew tokens.
 
 This page will show a quick start for this backend. For detailed documentation
 on every path, use `vault path-help` after mounting the backend.
 
 ## Quick Start
 
-The first step to using the mssql backend is to mount it.
-Unlike the `generic` backend, the `mssql` backend is not mounted by default.
+The first step to using the backend is to mount it.
+Unlike the `generic` backend, the `azureservicebus` backend is not mounted by default.
 
 ```
-$ vault mount mssql
-Successfully mounted 'mssql' at 'mssql'!
+$ vault mount azureservicebus
+Successfully mounted 'azureservicebus' at 'azureservicebus'!
 ```
 
-Next, we must configure Vault to know how to connect to the MSSQL
-instance. This is done by providing a DSN (Data Source Name):
+Next, we must configure Vault to know how which Service Bus resource we wish to connect to.
+This is specified with resource name and namespace in `config/resource`:
 
 ```
-$ vault write mssql/config/connection \
-    connection_string="server=localhost;port=1433;user id=sa;password=Password!;database=AdventureWorks;app name=vault;"
-Success! Data written to: mssql/config/connection
+$ vault write azureservicebus/config/resource \
+  name=my_eventhub \
+  namespace=my_service_bus_ns
+Success! Data written to: azureservicebus/config/resource
 ```
 
-In this case, we've configured Vault with the user "sa" and password "Password!",
-connecting to an instance at "localhost" on port 1433. It is not necessary
-that Vault has the sa login, but the user must have privileges to create
-logins and manage processes. The fixed server roles `securityadmin` and
-`processadmin` are examples of built-in roles that grant these permissions. The
-user also must have privileges to create database users and grant permissions in
-the databases that Vault manages.  The fixed database roles `db_accessadmin` and
-`db_securityadmin` are examples or built-in roles that grant these permissions.
-
-Optionally, we can configure the lease settings for credentials generated
-by Vault. This is done by writing to the `config/lease` key:
+We can configure the default expiry time for tokens generated
+by Vault. This is done by writing `config/lease`:
 
 ```
-$ vault write mssql/config/lease \
-    ttl=1h \
-    ttl_max=24h
-Success! Data written to: mssql/config/lease
+$ vault write azureservicebus/config/lease \
+    ttl=1h
+Success! Data written to: azureservicebus/config/lease
 ```
 
-This restricts each credential to being valid or leased for 1 hour
-at a time, with a maximum use period of 24 hours. This forces an
-application to renew their credentials at least hourly, and to recycle
-them once per day.
-
-The next step is to configure a role. A role is a logical name that maps
-to a policy used to generate those credentials. For example, lets create
-a "readonly" role:
+Configure roles by specifying the Share Access Policy name and 
+primary key in `roles/<role_name>`. You can get these from the 
+classic Azure Portal.
 
 ```
-$ vault write mssql/roles/readonly \
-    sql="CREATE LOGIN [{{name}}] WITH PASSWORD = '{{password}}'; USE AdventureWorks; CREATE USER [{{name}}] FOR LOGIN [{{name}}]; GRANT SELECT ON SCHEMA::dbo TO [{{name}}]"
-Success! Data written to: mssql/roles/readonly
+$ vault write azureservicebus/roles/all \
+    sas_policy_name=manage_send_listen_policy \
+    sas_policy_key=your_policy_primary_key \
+    ttl=15m
+Success! Data written to: azureservicebus/roles/all
 ```
 
-By writing to the `roles/readonly` path we are defining the `readonly` role.
-This role will be created by evaluating the given `sql` statements. By
-default, the `{{name}}` and `{{password}}` fields will be populated by
-Vault with dynamically generated values. This SQL statement is creating
-the named login on the server, user on the AdventureWorks database, and
-then granting it `SELECT` on the `dbo` schema. More complex `GRANT` queries
-can be used to customize the privileges of the role.
+Expiry times can configured per role. If you have a Time-To-Live (`ttl`) time 
+specified in the role configuration, tokens generated with that role will
+respect the policy-specific policy. Otherwise, the default expiry time from 
+config/lease is used. In the example, tokens read from the `all` policy will
+always have a expiry time of 15 minutes instead of 1 hour. If ttl is not 
+specified in role, the default expiry time is used.
 
-To generate a new set of credentials, we simply read from that role:
+SAS restricts each token to being valid until its declared time. Vault will 
+not renew this token unlike some other secret backends, so clients need to 
+request for a new one.
 
 ```
-$ vault read mssql/creds/readonly
-Key           	Value
-lease_id      	mssql/creds/readonly/cdf23ac8-6dbd-4bf9-9919-6acaaa86ba6c
-lease_duration	3600
-password      	ee202d0d-e4fd-4410-8d14-2a78c5c8cb76
-username      	root-a147d529-e7d6-4a16-8930-4c3e72170b19
+$ vault read azureservicebus/token/all
+Key            	Value
+lease_id       	azureservicebus/token/all/e94b071c-1fc8-6e8a-76df-b434bf9aa3e7
+lease_duration 	900
+lease_renewable	false
+token          	SharedAccessSignature sr=https%3a%2f%2fmy_service_bus_ns.servicebus.windows.net%2fmy_eventhub&sig=NvCCJ&se=146534&skn=manage_send_listen_policy
 ```
 
-By reading from the `creds/readonly` path, Vault has generated a new
-set of credentials using the `readonly` role configuration. Here we
-see the dynamically generated username and password, along with a one
-hour lease.
-
-Using ACLs, it is possible to restrict using the mssql backend such
-that trusted operators can manage the role definitions, and both
-users and applications are restricted in the credentials they are
-allowed to read.
+By reading from the `token/all` path, Vault has generated a new
+SAS token using the `all` role configuration, which will be valid for 15 minutes.
 
 ## API
 
-### /mssql/config/connection
+### /azureservicebus/config/resource
 #### POST
 
 <dl class="api">
   <dt>Description</dt>
   <dd>
-    Configures the connection DSN used to communicate with Sql Server.
+    Configures the Service Bus resource name and namespace.
   </dd>
 
   <dt>Method</dt>
   <dd>POST</dd>
 
   <dt>URL</dt>
-  <dd>`/mssql/config/connection`</dd>
+  <dd>`/azureservicebus/config/resource`</dd>
 
   <dt>Parameters</dt>
   <dd>
     <ul>
       <li>
-        <span class="param">connection_string</span>
+        <span class="param">name</span>
         <span class="param-flags">required</span>
-        The MSSQL DSN
+        Resource name.
       </li>
     </ul>
   </dd>
   <dd>
     <ul>
       <li>
-        <span class="param">max_open_connections</span>
-        <span class="param-flags">optional</span>
-        Maximum number of open connections to the database.
+        <span class="param">namespace</span>
+        <span class="param-flags">required</span>
+        Service Bus namespace.
 	Defaults to 2.
-      </li>
-    </ul>
-  </dd>
-  <dd>
-    <ul>
-      <li>
-        <span class="param">verify_connection</span>
-        <span class="param-flags">optional</span>
-	If set, connection_string is verified by actually connecting to the database.
-	Defaults to true.
       </li>
     </ul>
   </dd>
@@ -162,20 +130,20 @@ allowed to read.
   </dd>
 </dl>
 
-### /mssql/config/lease
+### /azureservicebus/config/lease
 #### POST
 
 <dl class="api">
   <dt>Description</dt>
   <dd>
-    Configures the lease settings for generated credentials.
+    Configures the lease settings for generated token.
   </dd>
 
   <dt>Method</dt>
   <dd>POST</dd>
 
   <dt>URL</dt>
-  <dd>`/mssql/config/lease`</dd>
+  <dd>`/azureservicebus/config/lease`</dd>
 
   <dt>Parameters</dt>
   <dd>
@@ -186,12 +154,6 @@ allowed to read.
         The ttl value provided as a string duration
         with time suffix. Hour is the largest suffix.
       </li>
-      <li>
-        <span class="param">ttl_max</span>
-        <span class="param-flags">required</span>
-        The maximum ttl value provided as a string duration
-        with time suffix. Hour is the largest suffix.
-      </li>
     </ul>
   </dd>
 
@@ -201,7 +163,7 @@ allowed to read.
   </dd>
 </dl>
 
-### /mssql/roles/
+### /azureservicebus/roles/
 #### POST
 
 <dl class="api">
@@ -214,17 +176,33 @@ allowed to read.
   <dd>POST</dd>
 
   <dt>URL</dt>
-  <dd>`/mssql/roles/<name>`</dd>
+  <dd>`/azureservicebus/roles/<name>`</dd>
 
   <dt>Parameters</dt>
   <dd>
     <ul>
       <li>
-        <span class="param">sql</span>
+        <span class="param">sas_policy_name</span>
         <span class="param-flags">required</span>
-        The SQL statements executed to create and configure the role.
-        Must be semi-colon separated. The '{{name}}' and '{{password}}'
-        values will be substituted.
+        The name of the Shared Access Policy this role is associated with.
+      </li>
+    </ul>
+  </dd>
+  <dd>
+    <ul>
+      <li>
+        <span class="param">sas_policy_key</span>
+        <span class="param-flags">required</span>
+        The primary key of the Shared Access Policy.
+      </li>
+    </ul>
+  </dd>
+  <dd>
+    <ul>
+      <li>
+        <span class="param">ttl</span>
+        <span class="param-flags">optional</span>
+        The role-specifc expiry time.
       </li>
     </ul>
   </dd>
@@ -247,7 +225,7 @@ allowed to read.
   <dd>GET</dd>
 
   <dt>URL</dt>
-  <dd>`/mssql/roles/<name>`</dd>
+  <dd>`/azureservicebus/roles/<name>`</dd>
 
   <dt>Parameters</dt>
   <dd>
@@ -260,7 +238,8 @@ allowed to read.
     ```javascript
     {
       "data": {
-        "sql": "CREATE LOGIN..."
+        "sas_policy_name": "manage_send_listen_policy",
+        "ttl":             0
       }
     }
     ```
@@ -295,7 +274,7 @@ allowed to read.
   {
     "auth": null,
     "data": {
-      "keys": ["dev", "prod"]
+      "keys": ["all", "prod"]
     },
     "lease_duration": 2592000,
     "lease_id": "",
@@ -318,7 +297,7 @@ allowed to read.
   <dd>DELETE</dd>
 
   <dt>URL</dt>
-  <dd>`/mssql/roles/<name>`</dd>
+  <dd>`/azureservicebus/roles/<name>`</dd>
 
   <dt>Parameters</dt>
   <dd>
@@ -331,7 +310,7 @@ allowed to read.
   </dd>
 </dl>
 
-### /mssql/creds/
+### /azureservicebus/creds/
 #### GET
 
 <dl class="api">
@@ -344,7 +323,7 @@ allowed to read.
   <dd>GET</dd>
 
   <dt>URL</dt>
-  <dd>`/mssql/creds/<name>`</dd>
+  <dd>`/azureservicebus/creds/<name>`</dd>
 
   <dt>Parameters</dt>
   <dd>
@@ -357,8 +336,7 @@ allowed to read.
     ```javascript
     {
       "data": {
-        "username": "root-a147d529-e7d6-4a16-8930-4c3e72170b19",
-        "password": "ee202d0d-e4fd-4410-8d14-2a78c5c8cb76"
+        "token": "SharedAccessSignature sr=https..."
       }
     }
     ```
