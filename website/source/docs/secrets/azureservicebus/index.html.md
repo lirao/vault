@@ -119,7 +119,6 @@ SAS token using the `all` role configuration, which will be valid for 15 minutes
         <span class="param">namespace</span>
         <span class="param-flags">required</span>
         Service Bus namespace.
-	Defaults to 2.
       </li>
     </ul>
   </dd>
