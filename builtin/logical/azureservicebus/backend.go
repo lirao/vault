@@ -48,7 +48,7 @@ func (b *backend) LeaseConfig(s logical.Storage) (*configLease, error) {
 		return nil, err
 	}
 	if entry == nil {
-		return nil, fmt.Errorf("configure the default token expiry time with config/lease first")
+		return nil, nil
 	}
 
 	var result configLease
