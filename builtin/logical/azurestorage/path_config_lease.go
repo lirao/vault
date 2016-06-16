@@ -14,7 +14,7 @@ func pathConfigLease(b *backend) *framework.Path {
 		Fields: map[string]*framework.FieldSchema{
 			"ttl": &framework.FieldSchema{
 				Type:        framework.TypeString,
-				Description: "Default lease time for the SAS token",
+				Description: "Default lease time for the SAS URI",
 			},
 		},
 

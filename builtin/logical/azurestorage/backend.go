@@ -1,6 +1,7 @@
 package azurestorage
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 
@@ -20,7 +21,7 @@ func Backend() *framework.Backend {
 		Help: strings.TrimSpace(backendHelp),
 
 		Paths: []*framework.Path{
-			pathConfigResource(&b),
+			pathConfigAccount(&b),
 			pathConfigLease(&b),
 			pathListRoles(&b),
 			pathRoles(&b),
@@ -44,7 +45,25 @@ type backend struct {
 func (b *backend) StorageClient(s logical.Storage) (*storage.Client, error) {
 	if b.client == nil {
 		//Init the client
-		client := storage.NewClient(accountName, accountKey, blobServiceBaseURL, apiVer, true)
+		entry, err := s.Get("config/account")
+		if err != nil {
+			return nil, err
+		}
+		if entry == nil {
+			return nil,
+				fmt.Errorf("configure the Storage Account information with config/account first")
+		}
+
+		var accConfig accountConfig
+		if err := entry.DecodeJSON(&accConfig); err != nil {
+			return nil, err
+		}
+
+		client, err := storage.NewClient(accConfig.Name, accConfig.Key, accConfig.BaseURL, accConfig.APIVer, accConfig.HTTPS)
+		if err != nil {
+			return nil, err
+		}
+		b.client = &client
 	}
 	return b.client, nil
 }
@@ -60,24 +79,6 @@ func (b *backend) LeaseConfig(s logical.Storage) (*configLease, error) {
 	}
 
 	var result configLease
-	if err := entry.DecodeJSON(&result); err != nil {
-		return nil, err
-	}
-
-	return &result, nil
-}
-
-// ResourceConfig returns the Event Hub resource configuration
-func (b *backend) ResourceConfig(s logical.Storage) (*resourceConfig, error) {
-	entry, err := s.Get("config/resource")
-	if err != nil {
-		return nil, err
-	}
-	if entry == nil {
-		return nil, nil
-	}
-
-	var result resourceConfig
 	if err := entry.DecodeJSON(&result); err != nil {
 		return nil, err
 	}

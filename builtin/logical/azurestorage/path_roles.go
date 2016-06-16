@@ -29,13 +29,17 @@ func pathRoles(b *backend) *framework.Path {
 				Type:        framework.TypeString,
 				Description: "Name of the role.",
 			},
-			"sas_policy_name": &framework.FieldSchema{
+			"container": &framework.FieldSchema{
 				Type:        framework.TypeString,
-				Description: "Shared access key policy name",
+				Description: "Container name",
 			},
-			"sas_policy_key": &framework.FieldSchema{
+			"blob": &framework.FieldSchema{
 				Type:        framework.TypeString,
-				Description: "Shared access primary key",
+				Description: "Name of blob",
+			},
+			"permissions": &framework.FieldSchema{
+				Type:        framework.TypeString,
+				Description: "Permissions e.g. rw",
 			},
 			"ttl": &framework.FieldSchema{
 				Type:        framework.TypeString,
@@ -93,8 +97,10 @@ func (b *backend) pathRoleRead(
 
 	return &logical.Response{
 		Data: map[string]interface{}{
-			"sas_policy_name": role.SASPolicyName,
-			"ttl":             role.TTL,
+			"blob":        role.Blob,
+			"container":   role.Container,
+			"permissions": role.Permissions,
+			"ttl":         role.TTL,
 		},
 	}, nil
 }
@@ -112,8 +118,9 @@ func (b *backend) pathRoleList(
 func (b *backend) pathRoleCreate(
 	req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	rolename := data.Get("name").(string)
-	policyname := data.Get("sas_policy_name").(string)
-	policykey := data.Get("sas_policy_key").(string)
+	blob := data.Get("blob").(string)
+	container := data.Get("container").(string)
+	permissions := data.Get("permissions").(string)
 
 	var ttl time.Duration
 	var err error
@@ -128,9 +135,10 @@ func (b *backend) pathRoleCreate(
 
 	// Store it
 	entry, err := logical.StorageEntryJSON("role/"+rolename, &roleEntry{
-		SASPolicyName: policyname,
-		SASPolicyKey:  policykey,
-		TTL:           ttl,
+		Blob:        blob,
+		Container:   container,
+		Permissions: permissions,
+		TTL:         ttl,
 	})
 	if err != nil {
 		return nil, err
@@ -142,9 +150,10 @@ func (b *backend) pathRoleCreate(
 }
 
 type roleEntry struct {
-	SASPolicyName string        `json:"sas_policy_name"`
-	SASPolicyKey  string        `json:"sas_policy_key"`
-	TTL           time.Duration `json:"ttl"`
+	Blob        string        `json:"blob"`
+	Container   string        `json:"container"`
+	Permissions string        `json:"permissions"`
+	TTL         time.Duration `json:"ttl"`
 }
 
 const pathRoleHelpSyn = `
@@ -154,6 +163,14 @@ Manage the roles that can be created with this backend.
 const pathRoleHelpDesc = `
 This path lets you manage the roles that can be created with this backend.
 
-Each role corresponds to an existing SAS policy in the Service Bus resource.
+Each role corresponds to an existing Storage Blob and a set of permissions.
+Valid permission flags are: 
+r - read
+a - add block
+c - create
+w - write
+d - delete
+For more information refer to https://msdn.microsoft.com/en-us/library/azure/dn140255.aspx
+
 Roles can be configured with a role-specific lease time.
 `

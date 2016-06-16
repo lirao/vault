@@ -2,10 +2,7 @@ package azurestorage
 
 import (
 	"fmt"
-	"net/url"
 	"time"
-
-	"strings"
 
 	"github.com/hashicorp/vault/logical"
 	"github.com/hashicorp/vault/logical/framework"
@@ -55,33 +52,36 @@ func (b *backend) pathTokenRead(
 		}
 		ttl = leaseConfig.TTL
 	}
-	resourceConfig, err := b.ResourceConfig(req.Storage)
+
+	expiry := time.Now().Add(ttl)
+
+	client, err := b.StorageClient(req.Storage)
+	if err != nil {
+		return nil, err
+	}
+	blobcli := client.GetBlobService()
+	uri, err := blobcli.GetBlobSASURI(role.Container, role.Blob, expiry, role.Permissions)
 	if err != nil {
 		return nil, err
 	}
 
-	//Encode the SAS token. Reference: https://azure.microsoft.com/en-us/documentation/articles/service-bus-shared-access-signature-authentication/
-	uri := strings.ToLower(url.QueryEscape(resourceConfig.ResourceURI))
-	expirytime := time.Now().Add(ttl).Unix()
-	signstring := fmt.Sprintf("%v\n%v", uri, expirytime)
-	signature := url.QueryEscape(ComputeHmac256(signstring, role.SASPolicyKey))
-	token := fmt.Sprintf("SharedAccessSignature sr=%v&sig=%v&se=%v&skn=%v", uri, signature, expirytime, role.SASPolicyName)
-
-	// Return the secret. Nothing need to be saved in the secret itself
+	// Return the secret. No data need to be saved in the secret itself
 	resp := b.Secret(SecretTokenType).Response(map[string]interface{}{
-		"policy_name": name,
-		"token":       token,
+		"blob":        role.Blob,
+		"container":   role.Container,
+		"permissions": role.Permissions,
+		"uri":         uri,
 	}, map[string]interface{}{})
 	resp.Secret.TTL = ttl
 	return resp, nil
 }
 
 const pathTokenHelpSyn = `
-Request a SAS token for a certain role.
+Request a SAS URI for a certain role.
 `
 
 const pathTokenHelpDesc = `
-This path generates a SAS token for a certain role. The
-token is generated on demand and will automatically 
+This path generates a SAS URI for a certain role. The
+URI is generated on demand and will automatically 
 expire when the lease is up.
 `
