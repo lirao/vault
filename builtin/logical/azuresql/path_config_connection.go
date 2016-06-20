@@ -92,7 +92,9 @@ const pathConfigConnectionHelpDesc = `
 This path configures the connection string used to connect to Azure SQL Server.
 The value of the string is a Data Source Name (DSN). An example is
 "server=<hostname>;port=<port>;user id=<username>;password=<password>;database=<database>"
-The user must have permissions to create and modify users of the specified database
+For valid parameters, refer to https://github.com/denisenkom/go-mssqldb
+
+The user must have permissions to create and modify users of the specified database.
 
 When configuring the connection string, the backend will verify its validity.
 If the database is not available when setting the connection string, set the

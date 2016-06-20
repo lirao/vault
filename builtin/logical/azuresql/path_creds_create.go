@@ -118,10 +118,17 @@ func (b *backend) pathCredsCreateRead(
 		return nil, err
 	}
 
+	// Generate a JDBC conn string from all these for clients to easily connect
+	connConfig, err := b.ConnConfig(req.Storage)
+	connParams := ParseConnString(connConfig.ConnectionString)
+	jdbc := fmt.Sprintf("jdbc:sqlserver://%s:1433;database=%s;user=%s@%s;password=%s;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;",
+		connParams["server"], connParams["database"], username, connParams["server"], password)
+
 	// Return the secret
 	resp := b.Secret(SecretCredsType).Response(map[string]interface{}{
 		"username": username,
 		"password": password,
+		"jdbc":     jdbc,
 		"fwrule":   fwrule,
 	}, map[string]interface{}{
 		"username": username,
