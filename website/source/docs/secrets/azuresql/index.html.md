@@ -115,14 +115,15 @@ lease_id       	azuresql/creds/readonly/a80c8cff-7d4f-edcf-37b8-c341506a966c
 lease_duration 	60
 lease_renewable	true
 fwrule
-password       	1b615d23-7484-3cf9-3420-ea6f4565a3ec
-username       	root-ca230771-3abe-3cb1-21a4-05388844dd23
+jdbc           	jdbc:sqlserver://azure_sql_server.database.windows.net:1433;database=my_azure_db;user=root-cabd2194-45af-5d9c-84ee-6c9adb448286@azure_sql_server.database.windows.net;password=121534cf-3118-8e33-ce32-9fa0dda197bb;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;
+password       	121534cf-3118-8e33-ce32-9fa0dda197bb
+username       	root-cabd2194-45af-5d9c-84ee-6c9adb448286
 ```
 
 By reading from the `creds/readonly` path, Vault has generated a new
 set of credentials using the `readonly` role configuration. Here we
 see the dynamically generated username and password, along with a one
-hour lease.
+hour lease. A jdbc string is generated with the credentials for convenience.
 
 If Azure SQL Server is set up with a Firewall that does not allow all 
 incoming password, then in order for a user to be able to use the generated 

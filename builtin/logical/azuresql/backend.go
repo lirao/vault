@@ -102,17 +102,8 @@ func (b *backend) AzureClient(s logical.Storage) (*azsql.SQLDatabaseClient, erro
 	return b.azureClient, nil
 }
 
-// DB returns the default database connection.
-func (b *backend) DB(s logical.Storage) (*sql.DB, error) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
-	// If we already have a DB, we got it!
-	if b.db != nil {
-		return b.db, nil
-	}
-
-	// Otherwise, attempt to make connection
+//ConnConfig make it easier to read out config/connection values
+func (b *backend) ConnConfig(s logical.Storage) (*connectionConfig, error) {
 	entry, err := s.Get("config/connection")
 	if err != nil {
 		return nil, err
@@ -125,9 +116,26 @@ func (b *backend) DB(s logical.Storage) (*sql.DB, error) {
 	if err := entry.DecodeJSON(&connConfig); err != nil {
 		return nil, err
 	}
-	connString := connConfig.ConnectionString
+	return &connConfig, nil
+}
 
-	db, err := sql.Open("mssql", connString)
+// DB returns the default database connection.
+func (b *backend) DB(s logical.Storage) (*sql.DB, error) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	// If we already have a DB, we got it!
+	if b.db != nil {
+		return b.db, nil
+	}
+
+	// Otherwise, attempt to make connection
+	connConfig, err := b.ConnConfig(s)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := sql.Open("mssql", connConfig.ConnectionString)
 	if err != nil {
 		return nil, err
 	}
