@@ -35,7 +35,7 @@ func pathRoles(b *backend) *framework.Path {
 			},
 			"blob": &framework.FieldSchema{
 				Type:        framework.TypeString,
-				Description: "Name of blob",
+				Description: "Name of blob. If left blank, will create a container-level SAS Uri.",
 			},
 			"permissions": &framework.FieldSchema{
 				Type:        framework.TypeString,
@@ -163,7 +163,9 @@ Manage the roles that can be created with this backend.
 const pathRoleHelpDesc = `
 This path lets you manage the roles that can be created with this backend.
 
-Each role corresponds to an existing Storage Blob and a set of permissions.
+Each role corresponds to an existing Storage Blob/Blob Container and a set 
+of permissions.
+
 Valid permission flags are: 
 r - read
 a - add block
