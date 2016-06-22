@@ -2,6 +2,7 @@ package azurestorage
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/vault/logical"
@@ -59,18 +60,26 @@ func (b *backend) pathTokenRead(
 	if err != nil {
 		return nil, err
 	}
+	accountConfig, err := b.Account(req.Storage)
+	if err != nil {
+		return nil, err
+	}
+
 	blobcli := client.GetBlobService()
 	uri, err := blobcli.GetBlobSASURI(role.Container, role.Blob, expiry, role.Permissions)
 	if err != nil {
 		return nil, err
 	}
+	token := strings.SplitN(uri, "?", 2)[1]
 
 	// Return the secret. No data need to be saved in the secret itself
 	resp := b.Secret(SecretTokenType).Response(map[string]interface{}{
+		"account":     accountConfig.Name,
 		"blob":        role.Blob,
 		"container":   role.Container,
 		"permissions": role.Permissions,
 		"uri":         uri,
+		"token":       token,
 	}, map[string]interface{}{})
 	resp.Secret.TTL = ttl
 	return resp, nil
