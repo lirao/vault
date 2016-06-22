@@ -42,20 +42,29 @@ type backend struct {
 	lock   sync.Mutex
 }
 
+func (b *backend) Account(s logical.Storage) (*accountConfig, error) {
+	//Init the client
+	entry, err := s.Get("config/account")
+	if err != nil {
+		return nil, err
+	}
+	if entry == nil {
+		return nil,
+			fmt.Errorf("configure the Storage Account information with config/account first")
+	}
+
+	var accConfig accountConfig
+	if err := entry.DecodeJSON(&accConfig); err != nil {
+		return nil, err
+	}
+	return &accConfig, nil
+}
+
 func (b *backend) StorageClient(s logical.Storage) (*storage.Client, error) {
 	if b.client == nil {
 		//Init the client
-		entry, err := s.Get("config/account")
+		accConfig, err := b.Account(s)
 		if err != nil {
-			return nil, err
-		}
-		if entry == nil {
-			return nil,
-				fmt.Errorf("configure the Storage Account information with config/account first")
-		}
-
-		var accConfig accountConfig
-		if err := entry.DecodeJSON(&accConfig); err != nil {
 			return nil, err
 		}
 
