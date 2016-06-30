@@ -1020,7 +1020,10 @@ func pathForContainer(name string) string {
 // helper method to construct the path to a blob given its container and blob
 // name
 func pathForBlob(container, name string) string {
-	return fmt.Sprintf("/%s/%s", container, name)
+	if len(name) > 0 {
+		return fmt.Sprintf("/%s/%s", container, name)
+	}
+	return fmt.Sprintf("/%s", container)
 }
 
 // GetBlobSASURI creates an URL to the specified blob which contains the Shared
@@ -1037,7 +1040,10 @@ func (b BlobStorageClient) GetBlobSASURI(container, name string, expiry time.Tim
 		return "", err
 	}
 	signedExpiry := expiry.UTC().Format(time.RFC3339)
-	signedResource := "b"
+	signedResource := "c"
+	if len(name) > 0 {
+		signedResource = "b"
+	}
 
 	stringToSign, err := blobSASStringToSign(b.client.apiVersion, canonicalizedResource, signedExpiry, signedPermissions)
 	if err != nil {
