@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -23,8 +22,23 @@ func TestBackend_basic(t *testing.T) {
 		Backend:        b,
 		Steps: []logicaltest.TestStep{
 			testAccStepConfig(t),
-			testAccStepRole(t),
-			testAccStepReadVerifyToken(t, "web"),
+			testAccStepRoleBlob(t),
+			testAccStepReadVerifyTokenBlob(t),
+		},
+	})
+}
+
+func TestBackend_container(t *testing.T) {
+	b, _ := Factory(logical.TestBackendConfig())
+
+	logicaltest.Test(t, logicaltest.TestCase{
+		AcceptanceTest: true,
+		PreCheck:       func() { testAccPreCheck(t) },
+		Backend:        b,
+		Steps: []logicaltest.TestStep{
+			testAccStepConfig(t),
+			testAccStepRoleContainer(t),
+			testAccStepReadVerifyTokenContainer(t),
 		},
 	})
 }
@@ -38,10 +52,10 @@ func TestBackend_roleCrud(t *testing.T) {
 		Backend:        b,
 		Steps: []logicaltest.TestStep{
 			testAccStepConfig(t),
-			testAccStepRole(t),
-			testAccStepReadRole(t, "web", os.Getenv("AZURE_STORAGE_POLICY"), 0),
-			testAccStepDeleteRole(t, "web"),
-			testAccStepReadRole(t, "web", "", 0),
+			testAccStepRoleBlob(t),
+			testAccStepReadRole(t, "blob", os.Getenv("AZURE_STORAGE_CONTAINER"), 0),
+			testAccStepDeleteRole(t, "blob"),
+			testAccStepReadRole(t, "blob", "", 0),
 		},
 	})
 }
@@ -57,7 +71,7 @@ func TestBackend_roleLeaseRead(t *testing.T) {
 			testAccStepConfig(t),
 			testAccStepRoleLease(t, "30m"),
 			testAccStepWriteLease(t),
-			testAccStepReadRole(t, "web", os.Getenv("AZURE_STORAGE_POLICY"), 30*time.Minute),
+			testAccStepReadRole(t, "web", os.Getenv("AZURE_STORAGE_CONTAINER"), 30*time.Minute),
 			testAccStepReadLease(t),
 		},
 	})
@@ -79,38 +93,40 @@ func TestBackend_leaseWriteRead(t *testing.T) {
 }
 
 func testAccPreCheck(t *testing.T) {
-	if v := os.Getenv("AZURE_STORAGE_RESNAME"); v == "" {
-		t.Fatal("AZURE_STORAGE_RESNAME must be set for acceptance tests")
+	if v := os.Getenv("AZURE_STORAGE_ACCESS_KEY"); v == "" {
+		t.Fatal("AZURE_STORAGE_ACCESS_KEY must be set for acceptance tests")
 	}
-	if v := os.Getenv("AZURE_STORAGE_NAMESPACE"); v == "" {
-		t.Fatal("AZURE_STORAGE_NAMESPACE must be set for acceptance tests")
+	if v := os.Getenv("AZURE_STORAGE_ACCOUNT"); v == "" {
+		t.Fatal("AZURE_STORAGE_ACCOUNT must be set for acceptance tests")
 	}
-	if v := os.Getenv("AZURE_STORAGE_POLICY"); v == "" {
-		t.Fatal("AZURE_STORAGE_POLICY must be set for acceptance tests")
+	if v := os.Getenv("AZURE_STORAGE_CONTAINER"); v == "" {
+		t.Fatal("AZURE_STORAGE_CONTAINER must be set for acceptance tests")
 	}
-	if v := os.Getenv("AZURE_STORAGE_KEY"); v == "" {
-		t.Fatal("AZURE_STORAGE_KEY must be set for acceptance tests")
+	if v := os.Getenv("AZURE_STORAGE_BLOB"); v == "" {
+		t.Fatal("AZURE_STORAGE_BLOB must be set for acceptance tests")
 	}
 }
 
 func testAccStepConfig(t *testing.T) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.UpdateOperation,
-		Path:      "config/resource",
+		Path:      "config/account",
 		Data: map[string]interface{}{
-			"name":      os.Getenv("AZURE_STORAGE_RESNAME"),
-			"namespace": os.Getenv("AZURE_STORAGE_NAMESPACE"),
+			"account_name": os.Getenv("AZURE_STORAGE_ACCOUNT"),
+			"account_key":  os.Getenv("AZURE_STORAGE_ACCESS_KEY"),
 		},
 	}
 }
 
-func testAccStepRole(t *testing.T) logicaltest.TestStep {
+func testAccStepRoleBlob(t *testing.T) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.UpdateOperation,
-		Path:      "roles/web",
+		Path:      "roles/blob",
 		Data: map[string]interface{}{
-			"sas_policy_name": os.Getenv("AZURE_STORAGE_POLICY"),
-			"sas_policy_key":  os.Getenv("AZURE_STORAGE_KEY"),
+			"container":   os.Getenv("AZURE_STORAGE_CONTAINER"),
+			"blob":        os.Getenv("AZURE_STORAGE_BLOB"),
+			"permissions": "r",
+			"ttl":         "15m",
 		},
 	}
 }
@@ -120,9 +136,22 @@ func testAccStepRoleLease(t *testing.T, ttl string) logicaltest.TestStep {
 		Operation: logical.UpdateOperation,
 		Path:      "roles/web",
 		Data: map[string]interface{}{
-			"sas_policy_name": os.Getenv("AZURE_STORAGE_POLICY"),
-			"sas_policy_key":  os.Getenv("AZURE_STORAGE_KEY"),
-			"ttl":             ttl,
+			"container":   os.Getenv("AZURE_STORAGE_CONTAINER"),
+			"blob":        os.Getenv("AZURE_STORAGE_BLOB"),
+			"permissions": "r",
+			"ttl":         ttl,
+		},
+	}
+}
+
+func testAccStepRoleContainer(t *testing.T) logicaltest.TestStep {
+	return logicaltest.TestStep{
+		Operation: logical.UpdateOperation,
+		Path:      "roles/container",
+		Data: map[string]interface{}{
+			"container":   os.Getenv("AZURE_STORAGE_CONTAINER"),
+			"permissions": "rl",
+			"ttl":         "15m",
 		},
 	}
 }
@@ -134,63 +163,81 @@ func testAccStepDeleteRole(t *testing.T, n string) logicaltest.TestStep {
 	}
 }
 
-func testAccStepReadVerifyToken(t *testing.T, name string) logicaltest.TestStep {
+func testAccStepReadVerifyTokenBlob(t *testing.T) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.ReadOperation,
-		Path:      "token/" + name,
+		Path:      "token/blob",
 		Check: func(resp *logical.Response) error {
 			var d struct {
-				Policy string `mapstructure:"policy_name"`
-				Token  string `mapstructure:"token"`
+				URI string `mapstructure:"uri"`
 			}
 			if err := mapstructure.Decode(resp.Data, &d); err != nil {
 				return err
 			}
-			log.Printf("[WARN] Generated token: %v", d)
+			log.Printf("[WARN] Generated URI: %v", d)
 
-			//Use HTTP POST REST API to verify this
-			url := fmt.Sprintf("https://%s.servicebus.windows.net/%s/messages", os.Getenv("AZURE_STORAGE_NAMESPACE"), os.Getenv("AZURE_STORAGE_RESNAME"))
-
-			client := &http.Client{}
-
-			httpreq, err := http.NewRequest("POST", url, strings.NewReader("{}"))
-			httpreq.Header.Add("Content-Type", "application/json")
-			httpreq.Header.Add("ContentType", "application/atom+xml;type=entry;charset=utf-8")
-			httpreq.Header.Add("Authorization", d.Token)
-			httpresp, err := client.Do(httpreq)
+			httpresp, err := http.Get(d.URI)
 
 			if err != nil {
 				return err
 			}
-			if httpresp.StatusCode != 201 {
-				return fmt.Errorf("[ERROR] Verification of SAS token failed with %s: %v", url, httpresp)
+			if httpresp.StatusCode != 200 {
+				return fmt.Errorf("[ERROR] Verification of SAS token (single blob) failed with %s: %v", d.URI, httpresp)
 			}
 			return nil
 		},
 	}
 }
 
-func testAccStepReadRole(t *testing.T, name, policy string, ttl time.Duration) logicaltest.TestStep {
+func testAccStepReadVerifyTokenContainer(t *testing.T) logicaltest.TestStep {
+	return logicaltest.TestStep{
+		Operation: logical.ReadOperation,
+		Path:      "token/container",
+		Check: func(resp *logical.Response) error {
+			var d struct {
+				URI string `mapstructure:"uri"`
+			}
+			if err := mapstructure.Decode(resp.Data, &d); err != nil {
+				return err
+			}
+			log.Printf("[WARN] Generated URI: %v", d)
+
+			url := fmt.Sprintf("%s&comp=list&restype=container", d.URI)
+
+			httpresp, err := http.Get(url)
+
+			if err != nil {
+				return err
+			}
+			if httpresp.StatusCode != 200 {
+				return fmt.Errorf("[ERROR] Verification of SAS token (container) failed with %s: %v", url, httpresp)
+			}
+			return nil
+		},
+	}
+}
+
+func testAccStepReadRole(t *testing.T, name, container string, ttl time.Duration) logicaltest.TestStep {
 	return logicaltest.TestStep{
 		Operation: logical.ReadOperation,
 		Path:      "roles/" + name,
 		Check: func(resp *logical.Response) error {
 			if resp == nil {
-				if policy == "" {
+				if container == "" {
 					return nil
 				}
 				return fmt.Errorf("bad: %#v", resp)
 			}
 
 			var d struct {
-				Policy string        `mapstructure:"sas_policy_name"`
-				TTL    time.Duration `mapstructure:"ttl"`
+				Container string        `mapstructure:"container"`
+				TTL       time.Duration `mapstructure:"ttl"`
 			}
 			if err := mapstructure.Decode(resp.Data, &d); err != nil {
 				return err
 			}
 
-			if d.Policy != policy || (ttl > 0 && d.TTL != ttl) {
+			if d.Container != container || (ttl > 0 && d.TTL != ttl) {
 				return fmt.Errorf("bad: %#v", resp)
 			}
 
