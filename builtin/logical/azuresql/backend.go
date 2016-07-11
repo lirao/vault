@@ -2,8 +2,8 @@ package azuresql
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"strings"
 	"sync"
 
@@ -74,20 +74,13 @@ func (b *backend) AzureClient(s logical.Storage) (*azsql.SQLDatabaseClient, erro
 	}
 	// Use the Azure Go SDK
 	var client management.Client
-	if len(azureConfig.PublishSettings) > 0 {
-		client, err = management.ClientFromPublishSettingsFile(azureConfig.PublishSettings, azureConfig.SubscriptionID)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		cert, err := ioutil.ReadFile(azureConfig.ManagementCert)
-		if err != nil {
-			return nil, err
-		}
-		client, err = management.NewClient(azureConfig.SubscriptionID, cert)
-		if err != nil {
-			return nil, err
-		}
+	cert, err := base64.StdEncoding.DecodeString(azureConfig.ManagementCert)
+	if err != nil {
+		return nil, err
+	}
+	client, err = management.NewClient(azureConfig.SubscriptionID, cert)
+	if err != nil {
+		return nil, err
 	}
 
 	//Test out the client

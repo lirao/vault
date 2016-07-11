@@ -61,7 +61,7 @@ settings. This is needed to manage firewall rules for each generated credentials
 $ vault write azuresql/config/subscription \
  subscription_id=xxxx000-xxxx-xxxx-xxxx-xxxx1111xxxx \
  server=azure_sql_server \
- management_cert=/home/vaultuser/azure_mgmt_cert.pem
+ management_cert=$(cat azure_mgmt_cert.pem | base64)
 Success! Data written to: azuresql/config/subscription
 ```
 
@@ -227,8 +227,7 @@ management rights.
       <li>
         <span class="param">management_cert</span>
         <span class="param-flags">required</span>
-	Absolute path to the management certificate of the subscription, as a PEM file.
-	Defaults to 2.
+	Management certificate of the subscription, as a base64 encoded PEM file.
       </li>
     </ul>
   </dd>
