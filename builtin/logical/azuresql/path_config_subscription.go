@@ -1,7 +1,7 @@
 package azuresql
 
 import (
-	"io/ioutil"
+	"encoding/base64"
 
 	"github.com/Azure/azure-sdk-for-go/management"
 	"github.com/Azure/azure-sdk-for-go/management/sql"
@@ -19,15 +19,11 @@ func pathConfigSubscription(b *backend) *framework.Path {
 			},
 			"management_cert": &framework.FieldSchema{
 				Type:        framework.TypeString,
-				Description: "Absolute path to the management certificate PEM file",
+				Description: "Base64 encoded management certificate PEM file",
 			},
 			"server": &framework.FieldSchema{
 				Type:        framework.TypeString,
 				Description: "Azure SQL Server name",
-			},
-			"publish_settings": &framework.FieldSchema{
-				Type:        framework.TypeString,
-				Description: "Absolute path to .publishSettings file from https://manage.windowsazure.com/publishsettings",
 			},
 			"verify": &framework.FieldSchema{
 				Type:        framework.TypeBool,
@@ -50,7 +46,6 @@ func (b *backend) pathSubscriptionWrite(
 	subscriptionID := data.Get("subscription_id").(string)
 	managementCert := data.Get("management_cert").(string)
 	server := data.Get("server").(string)
-	publishSettings := data.Get("publish_settings").(string)
 
 	// Don't check the subscription if verification is disabled
 	verifyConnection := data.Get("verify").(bool)
@@ -58,21 +53,15 @@ func (b *backend) pathSubscriptionWrite(
 		// Use the Azure Go SDK
 		var client management.Client
 		var err error
-		if len(publishSettings) > 0 {
-			client, err = management.ClientFromPublishSettingsFile(publishSettings, subscriptionID)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			cert, err := ioutil.ReadFile(managementCert)
-			if err != nil {
-				return nil, err
-			}
-			client, err = management.NewClient(subscriptionID, cert)
-			if err != nil {
-				return nil, err
-			}
+		cert, err := base64.StdEncoding.DecodeString(managementCert)
+		if err != nil {
+			return nil, err
 		}
+		client, err = management.NewClient(subscriptionID, cert)
+		if err != nil {
+			return nil, err
+		}
+
 		dbclient := sql.NewClient(client)
 		_, err = dbclient.ListFirewallRules(server)
 		if err != nil {
@@ -82,10 +71,9 @@ func (b *backend) pathSubscriptionWrite(
 
 	// Store it
 	entry, err := logical.StorageEntryJSON("config/subscription", subscriptionConfig{
-		SubscriptionID:  subscriptionID,
-		ManagementCert:  managementCert,
-		Server:          server,
-		PublishSettings: publishSettings,
+		SubscriptionID: subscriptionID,
+		ManagementCert: managementCert,
+		Server:         server,
 	})
 
 	if err != nil {
@@ -99,10 +87,9 @@ func (b *backend) pathSubscriptionWrite(
 }
 
 type subscriptionConfig struct {
-	SubscriptionID  string `json:"subscription_id"`
-	ManagementCert  string `json:"management_cert"`
-	Server          string `json:"server"`
-	PublishSettings string `json:"publish_settings"`
+	SubscriptionID string `json:"subscription_id"`
+	ManagementCert string `json:"management_cert"`
+	Server         string `json:"server"`
 }
 
 const pathConfigSubscriptionHelpSyn = `
@@ -114,9 +101,8 @@ This path configures the subscription credentials of an the Azure subscription
 that the Azure SQL server belongs to. It's used to add firewall rules to the 
 Azure SQL Server.
 
-You can use either a .publishSettings file from https://manage.windowsazure.com/publishsettings 
-or a PEM certificate file. If both are provided, the .publishSettings file 
-will be used.
+You can extract the PEM certificate from a .publishSettings file obtained from https://manage.windowsazure.com/publishsettings 
+Reference: http://stuartpreston.net/2015/02/retrieving-microsoft-azure-management-certificates-for-use-in-cross-platform-automationprovisioning-tools/
 
 When configuring the subscription, the backend will verify its validity.
 If the subscription is not available when setting the connection string, set the
