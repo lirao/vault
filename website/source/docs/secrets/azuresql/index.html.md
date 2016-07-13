@@ -54,24 +54,6 @@ connecting to an instance at "localhost" on port 1433. The server admin user was
 during resource launch from the Azure portal, but you can use any user with privileges to create
 users and grant permissions for the particular database you want to to connect to.
 
-If firewall rules need to be created, then we need to configure Vault to access Azure management 
-settings. This is needed to manage firewall rules for each generated credentials.
-
-```
-$ vault write azuresql/config/subscription \
- subscription_id=xxxx000-xxxx-xxxx-xxxx-xxxx1111xxxx \
- server=azure_sql_server \
- management_cert=$(cat azure_mgmt_cert.pem | base64)
-Success! Data written to: azuresql/config/subscription
-```
-
-Here, we've specified the name of the Azure SQL server, the subscription ID of the 
-server, and the absolute path of the management PEM certificate of the subscription.
-This allows Vault to create and delete firewall rules on the Azure SQL server.
-The management certificate file can be obtained and extracted in this way:
-http://stuartpreston.net/2015/02/retrieving-microsoft-azure-management-certificates-for-use-in-cross-platform-automationprovisioning-tools/
-
-
 Optionally, we can configure the lease settings for credentials generated
 by Vault. This is done by writing to the `config/lease` key:
 
@@ -125,23 +107,41 @@ set of credentials using the `readonly` role configuration. Here we
 see the dynamically generated username and password, along with a one
 hour lease. A jdbc string is generated with the credentials for convenience.
 
-If Azure SQL Server is set up with a Firewall that does not allow all 
-incoming password, then in order for a user to be able to use the generated 
-credentials, we need to add a firewall rule. The IP to be added to the 
-rule is appended to the `creds/readonly` path:
+If the Azure SQL Server exists in its own subscription account without any other resources 
+in it, vault can be configured to manage firewall rules too. This needs access to Azure management 
+settings for the entire subscription account.
 
 ```
-$ vault read azuresql/creds/readonly/112.22.25.32
+$ vault write azuresql/config/subscription \
+ subscription_id=xxxx000-xxxx-xxxx-xxxx-xxxx1111xxxx \
+ server=azure_sql_server \
+ management_cert=$(cat azure_mgmt_cert.pem | base64)
+Success! Data written to: azuresql/config/subscription
+```
+
+Here, we've specified the name of the Azure SQL server, the subscription ID of the 
+server, and the absolute path of the management certificate of the entire subscription.
+This allows Vault to create and delete firewall rules on the Azure SQL server.
+The management certificate file can be obtained and extracted in this way:
+http://stuartpreston.net/2015/02/retrieving-microsoft-azure-management-certificates-for-use-in-cross-platform-automationprovisioning-tools/
+
+After configureing the  `config/subscription` path, to add firewall 
+rules for each set of credentials, append the IP to the `creds/readonly` path:
+
+```
+$ vault read azuresql/creds/readonly/192.22.25.32
 Key            	Value
-lease_id       	azuresql/creds/readonly/112.22.25.32/c30b8fa5-6c1c-4c38-53bd-c597133645e0
+lease_id       	azuresql/creds/readonly/192.22.25.32/c30b8fa5-6c1c-4c38-53bd-c597133645e0
 lease_duration 	60
 lease_renewable	true
 fwrule         	0b9ebcb5-801c-d85c-9aa1-e02e25558b91-112.22.25.32
+jdbc           	jdbc:sqlserver://azure_sql_server.database.windows.net:1433;database=my_azure_db;user=root-0b9ebcb5-801c-d85c-9aa1-e02e25558b91@azure_sql_server.database.windows.net;password=38c82607-1e1f-0321-603d-d295a53b18dd;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;
 password       	38c82607-1e1f-0321-603d-d295a53b18dd
 username       	root-0b9ebcb5-801c-d85c-9aa1-e02e25558b91
 ```
-This requires the `config/subscription` path to be set up with Azure SQL Server 
-management rights.
+
+NOTE: If your Azure SQL Server share a subscription with other resources, configure
+firewall rules manually.
 
 ## API
 
