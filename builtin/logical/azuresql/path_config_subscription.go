@@ -97,9 +97,12 @@ Configure the subscription and connection details to talk to Azure SQL Server.
 `
 
 const pathConfigSubscriptionHelpDesc = `
-This path configures the subscription credentials of an the Azure subscription 
+(Optional) This path configures the management credentials of an the Azure subscription 
 that the Azure SQL server belongs to. It's used to add firewall rules to the 
 Azure SQL Server.
+
+Only use this path if the Azure SQL Server is in its own subscription account, as 
+the management certificate grants access to all resources in the subscription.
 
 You can extract the PEM certificate from a .publishSettings file obtained from https://manage.windowsazure.com/publishsettings 
 Reference: http://stuartpreston.net/2015/02/retrieving-microsoft-azure-management-certificates-for-use-in-cross-platform-automationprovisioning-tools/
