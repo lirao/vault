@@ -1,0 +1,14 @@
+backend "<<BACKEND>>" {
+  <<BACKEND_CONFIG>>
+}
+
+<<HA_BACKEND>>
+
+disable_mlock = true
+
+listener "tcp" {
+  address = "0.0.0.0:8200"
+  <<TLS_DISABLE>>
+  tls_cert_file = "/etc/certs/tls_ca_cert.crt"
+  tls_key_file = "<<TLS_KEY>>"
+}
