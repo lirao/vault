@@ -15,7 +15,7 @@ COPY ./docker/vault_check.py /vault_check.py
 COPY ./docker/ca-serve /usr/bin/ca-serve
 
 
-RUN mkdir -p /etc/ca-certs/root && mkdir -p /etc/ca-certs/intermediate && cp /etc/certs/cachain.crt /etc/ca-certs/root/cachain.crt
+RUN mkdir -p /etc/ca-certs/root && mkdir -p /etc/ca-certs/intermediate
 
 RUN chmod +x /start.sh; chmod +x /usr/bin/vault; chmod +x /usr/bin/ca-serve
 
