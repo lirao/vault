@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/vault/builtin/logical/consul"
 	"github.com/hashicorp/vault/builtin/logical/mssql"
 	"github.com/hashicorp/vault/builtin/logical/mysql"
+	"github.com/hashicorp/vault/builtin/logical/pgbouncer"
 	"github.com/hashicorp/vault/builtin/logical/pki"
 	"github.com/hashicorp/vault/builtin/logical/postgresql"
 	"github.com/hashicorp/vault/builtin/logical/rabbitmq"
@@ -75,19 +76,20 @@ func Commands(metaPtr *meta.Meta) map[string]cli.CommandFactory {
 					"ldap":     credLdap.Factory,
 				},
 				LogicalBackends: map[string]logical.Factory{
-					"aws":          aws.Factory,
+					"aws":             aws.Factory,
 					"azureservicebus": azureservicebus.Factory,
-					"azuresql":     azuresql.Factory,
-					"azurestorage": azurestorage.Factory,
-					"consul":       consul.Factory,
-					"postgresql":   postgresql.Factory,
-					"cassandra":    cassandra.Factory,
-					"pki":          pki.Factory,
-					"transit":      transit.Factory,
-					"mssql":        mssql.Factory,
-					"mysql":        mysql.Factory,
-					"ssh":          ssh.Factory,
-					"rabbitmq":     rabbitmq.Factory,
+					"azuresql":        azuresql.Factory,
+					"azurestorage":    azurestorage.Factory,
+					"consul":          consul.Factory,
+					"postgresql":      postgresql.Factory,
+					"cassandra":       cassandra.Factory,
+					"pki":             pki.Factory,
+					"transit":         transit.Factory,
+					"mssql":           mssql.Factory,
+					"mysql":           mysql.Factory,
+					"ssh":             ssh.Factory,
+					"rabbitmq":        rabbitmq.Factory,
+					"pgbouncer":       pgbouncer.Factory,
 				},
 				ShutdownCh:  command.MakeShutdownCh(),
 				SighupCh:    command.MakeSighupCh(),

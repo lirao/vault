@@ -1035,7 +1035,9 @@ func (b BlobStorageClient) GetBlobSASURI(container, name string, expiry time.Tim
 		signedPermissions = permissions
 		blobURL           = b.GetBlobURL(container, name)
 	)
+	fmt.Print(blobURL)
 	canonicalizedResource, err := b.client.buildCanonicalizedResource(blobURL)
+	fmt.Print(canonicalizedResource)
 	if err != nil {
 		return "", err
 	}
