@@ -37,6 +37,7 @@ import (
 	physZooKeeper "github.com/hashicorp/vault/physical/zookeeper"
 
 	"github.com/hashicorp/vault/builtin/logical/aws"
+	"github.com/hashicorp/vault/builtin/logical/azureservicebus"
 	"github.com/hashicorp/vault/builtin/logical/cassandra"
 	"github.com/hashicorp/vault/builtin/logical/consul"
 	"github.com/hashicorp/vault/builtin/logical/database"
@@ -102,6 +103,7 @@ func Commands(metaPtr *meta.Meta) map[string]cli.CommandFactory {
 				},
 				LogicalBackends: map[string]logical.Factory{
 					"aws":        aws.Factory,
+					"azureservicebus": azureservicebus.Factory,
 					"consul":     consul.Factory,
 					"postgresql": postgresql.Factory,
 					"cassandra":  cassandra.Factory,
